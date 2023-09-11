@@ -18,11 +18,14 @@ struct TorrentInfo {
 }
 
 impl TorrentInfo {
-    fn hash(&self) -> String {
+    fn to_hash(&self) -> String {
         let bytes = serde_bencode::to_bytes(self).unwrap();
         let mut hash = Sha1::new();
         hash.update(bytes);
         format!("{:x}", hash.finalize())
+    }
+    fn pieces_hash(&self) -> String {
+        // self.pieces.chunks(20).map(|c| c.iter().map(|x| format!()))
     }
 }
 
@@ -74,10 +77,6 @@ fn main() {
     let command = &args[1];
 
     if command == "decode" {
-        // You can use print statements as follows for debugging, they'll be visible when running tests.
-        // println!("Logs from your program will appear here!");
-
-        // Uncomment this block to pass the first stage
         let encoded_value = &args[2];
         let value = format!("{}", decode(encoded_value).to_string());
         println!("{}", value);
@@ -86,7 +85,9 @@ fn main() {
         let meta_data: Torrent = serde_bencode::from_bytes(&path).unwrap();
         println!("Tracker URL: {}", meta_data.announce);
         println!("Length: {}", meta_data.info.length);
-        println!("Info Hash: {}", meta_data.info.hash());
+        println!("Info Hash: {}", meta_data.info.to_hash());
+        println!("Piece Length: {}", meta_data.info.piece_length);
+        println!("Piece: {:?}", meta_data.info.pieces.len());
     } else {
         println!("unknown command: {}", args[1])
     }
