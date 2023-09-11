@@ -1,5 +1,5 @@
 use serde_bencode::{from_str, value::Value};
-// use serde_json;
+use serde_json;
 use std::env;
 
 // Available if you need it!
@@ -55,7 +55,7 @@ fn main() {
         // let decoded_value = decode_bencoded_value(encoded_value);
         let value = from_str::<Value>(encoded_value).unwrap();
         // println!("{}", decoded_value.to_string());
-        println!("{:?}", decode(&value));
+        println!("{}", decode(&value));
     } else {
         println!("unknown command: {}", args[1])
     }
