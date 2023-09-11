@@ -1,4 +1,5 @@
-use serde_json;
+use serde_bencode::{from_str, value::Value};
+// use serde_json;
 use std::env;
 
 // Available if you need it!
@@ -7,6 +8,8 @@ use std::env;
 #[allow(dead_code)]
 fn decode_bencoded_value(encoded_value: &str) -> serde_json::Value {
     // If encoded_value starts with a digit, it's a number
+    let start = encoded_value.chars().next().unwrap();
+    if start == 'l' {}
     if encoded_value.chars().next().unwrap().is_digit(10) {
         // Example: "5:hello" -> "5"
         let colon_index = encoded_value.find(':').unwrap();
@@ -23,6 +26,21 @@ fn decode_bencoded_value(encoded_value: &str) -> serde_json::Value {
     }
 }
 
+fn decode(value: &Value) -> String {
+    match value {
+        Value::Int(i) => i.to_string(),
+        Value::List(l) => format!(
+            "[{}]",
+            l.iter()
+                .map(|v| decode(v))
+                .collect::<Vec<String>>()
+                .join(",")
+        ),
+        Value::Bytes(b) => String::from_utf8(b.clone()).unwrap(),
+        _ => panic!("Unhandled encoded value: {:?}", value),
+    }
+}
+
 // Usage: your_bittorrent.sh decode "<encoded_value>"
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -34,8 +52,10 @@ fn main() {
 
         // Uncomment this block to pass the first stage
         let encoded_value = &args[2];
-        let decoded_value = decode_bencoded_value(encoded_value);
-        println!("{}", decoded_value.to_string());
+        // let decoded_value = decode_bencoded_value(encoded_value);
+        let value = from_str::<Value>(encoded_value).unwrap();
+        // println!("{}", decoded_value.to_string());
+        println!("{:?}", decode(&value));
     } else {
         println!("unknown command: {}", args[1])
     }
