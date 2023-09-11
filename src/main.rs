@@ -1,8 +1,23 @@
+use serde::Deserialize;
 use serde_bencode::{from_str, value::Value};
-use std::env;
+use std::{env, fs};
 
 // Available if you need it!
 // use serde_bencode
+
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+struct Info {
+    name: String,
+    length: usize,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+struct MetaInfo {
+    announce: String,
+    info: Info,
+}
 
 #[allow(dead_code)]
 
@@ -40,6 +55,11 @@ fn main() {
         let encoded_value = &args[2];
         let value = from_str::<Value>(encoded_value).unwrap();
         println!("{}", decode(&value));
+    } else if command == "info" {
+        let path = fs::read(&args[2]).unwrap();
+        let meta_data: MetaInfo = serde_bencode::from_bytes(&path).unwrap();
+        println!("Tracker URL: {}", meta_data.announce);
+        println!("Length: {}", meta_data.info.length);
     } else {
         println!("unknown command: {}", args[1])
     }
