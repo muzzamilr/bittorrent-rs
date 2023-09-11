@@ -36,7 +36,7 @@ fn decode(value: &Value) -> String {
                 .collect::<Vec<String>>()
                 .join(",")
         ),
-        Value::Bytes(b) => String::from_utf8(b.clone()).unwrap(),
+        Value::Bytes(b) => format!("{:?}", String::from_utf8(b.clone()).unwrap()),
         _ => panic!("Unhandled encoded value: {:?}", value),
     }
 }
