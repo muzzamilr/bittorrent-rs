@@ -24,8 +24,11 @@ impl TorrentInfo {
         hash.update(bytes);
         format!("{:x}", hash.finalize())
     }
-    fn pieces_hash(&self) -> String {
-        // self.pieces.chunks(20).map(|c| c.iter().map(|x| format!()))
+    fn chunks_to_hex(&self, chunck: &[u8]) -> String {
+        chunck
+            .iter()
+            .map(|val| format!("{:02x}", val))
+            .collect::<String>()
     }
 }
 
@@ -87,7 +90,11 @@ fn main() {
         println!("Length: {}", meta_data.info.length);
         println!("Info Hash: {}", meta_data.info.to_hash());
         println!("Piece Length: {}", meta_data.info.piece_length);
-        println!("Piece: {:?}", meta_data.info.pieces.len());
+        println!("Piece Hashes:");
+        for chunck in meta_data.info.pieces.chunks(20) {
+            let chuck_hex = meta_data.info.chunks_to_hex(chunck);
+            println!("{}", chuck_hex);
+        }
     } else {
         println!("unknown command: {}", args[1])
     }
