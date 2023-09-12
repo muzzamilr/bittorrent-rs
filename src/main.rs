@@ -1,7 +1,10 @@
 use serde::{Deserialize, Serialize};
 use serde_bencode::{self, value::Value};
 use sha1::{Digest, Sha1};
-use std::{env, fmt::format, fs};
+use std::{env, fs};
+
+type Error = Box<dyn std::error::Error>;
+type Result<T> = std::result::Result<T, Error>;
 
 // Available if you need it!
 // use serde_bencode
@@ -18,17 +21,17 @@ struct TorrentInfo {
 }
 
 impl TorrentInfo {
-    fn to_hash_string(&self) -> String {
-        let bytes = serde_bencode::to_bytes(self).unwrap();
+    fn to_hash_string(&self) -> Result<String> {
+        let bytes = serde_bencode::to_bytes(self)?;
         let mut hash = Sha1::new();
         hash.update(bytes);
-        format!("{:x}", hash.finalize())
+        Ok(format!("{:x}", hash.finalize()))
     }
-    fn chunks_to_hex(&self, chunck: &[u8]) -> String {
-        chunck
+    fn chunks_to_hex(&self, chunck: &[u8]) -> Result<String> {
+        Ok(chunck
             .iter()
             .map(|val| format!("{:02x}", val))
-            .collect::<String>()
+            .collect::<String>())
     }
 }
 
@@ -40,41 +43,41 @@ struct Torrent {
 }
 
 impl Torrent {
-    fn from_file(path: Vec<u8>) -> Torrent {
-        return serde_bencode::from_bytes(&path).unwrap();
+    fn from_file(path: Vec<u8>) -> Result<Torrent> {
+        Ok(serde_bencode::from_bytes(&path).unwrap())
     }
 }
 
 #[allow(dead_code)]
 
-fn decode(encoded_value: &str) -> Value {
-    return serde_bencode::from_str::<Value>(encoded_value).unwrap();
+fn decode(encoded_value: &str) -> Result<Value> {
+    Ok(serde_bencode::from_str::<Value>(encoded_value)?)
 }
 
 trait ValueToString {
-    fn to_string(&self) -> String;
+    fn to_string(&self) -> Result<String>;
 }
 
 impl ValueToString for Value {
-    fn to_string(&self) -> String {
+    fn to_string(&self) -> Result<String> {
         return match self {
-            Value::Int(i) => i.to_string(),
-            Value::List(l) => format!(
+            Value::Int(i) => Ok(i.to_string()),
+            Value::List(l) => Ok(format!(
                 "[{}]",
                 l.iter()
                     .map(|v| v.to_string())
-                    .collect::<Vec<String>>()
+                    .collect::<Result<Vec<String>>>()?
                     .join(",")
-            ),
-            Value::Bytes(b) => format!("{:?}", String::from_utf8(b.clone()).unwrap()),
+            )),
+            Value::Bytes(b) => Ok(format!("{:?}", String::from_utf8(b.clone()).unwrap())),
             Value::Dict(d) => {
                 let mut result: Vec<String> = Vec::new();
                 for (key, value) in d {
                     let key_str = String::from_utf8_lossy(key).to_string();
-                    result.push(format!("\"{}\":{}", key_str, value.to_string()));
+                    result.push(format!("\"{}\":{}", key_str, value.to_string()?));
                 }
                 result.sort();
-                format!("{{{}}}", result.join(","))
+                Ok(format!("{{{}}}", result.join(",")))
             }
         };
     }
@@ -103,8 +106,8 @@ struct TrackerRequest {
 }
 
 impl TrackerRequest {
-    fn new(data: TorrentInfo) -> TrackerRequest {
-        TrackerRequest {
+    fn new(data: TorrentInfo) -> Result<TrackerRequest> {
+        Ok(TrackerRequest {
             info_hash: encode_url(&serde_bencode::to_bytes(&data).unwrap()),
             peer_id: "00112233445566778899".to_string(),
             port: 6881,
@@ -112,10 +115,10 @@ impl TrackerRequest {
             downloaded: 0,
             left: data.length as u64,
             compact: 1,
-        }
+        })
     }
 
-    fn fetch_info(&self, tracker_url: String) -> TrackerResponse {
+    fn fetch_info(&self, tracker_url: String) -> Result<TrackerResponse> {
         let client = reqwest::blocking::Client::new();
         let url = format!("{}?info_hash={}", tracker_url, self.info_hash);
         let req = client
@@ -130,7 +133,7 @@ impl TrackerRequest {
             .unwrap();
         let res = client.execute(req).unwrap();
 
-        serde_bencode::from_bytes(res.bytes().unwrap().as_ref()).unwrap()
+        Ok(serde_bencode::from_bytes(res.bytes().unwrap().as_ref()).unwrap())
     }
 }
 
@@ -142,8 +145,9 @@ struct TrackerResponse {
 }
 
 impl TrackerResponse {
-    fn from_peers(&self) -> Vec<String> {
-        self.peers
+    fn from_peers(&self) -> Result<Vec<String>> {
+        Ok(self
+            .peers
             .chunks(6)
             .map(|chuck| {
                 let ip = chuck[0..4]
@@ -154,39 +158,40 @@ impl TrackerResponse {
                 let port = u16::from_be_bytes([chuck[4], chuck[5]]);
                 format!("{}:{}", ip, port)
             })
-            .collect()
+            .collect())
     }
 }
 
 // Usage: your_bittorrent.sh decode "<encoded_value>"
-fn main() {
+fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     let command = &args[1];
 
     if command == "decode" {
         let encoded_value = &args[2];
-        let value = format!("{}", decode(encoded_value).to_string());
+        let value = format!("{}", decode(encoded_value)?.to_string()?);
         println!("{}", value);
     } else if command == "info" {
-        let path = fs::read(&args[2]).unwrap();
-        let meta_data: Torrent = Torrent::from_file(path);
+        let path = fs::read(&args[2])?;
+        let meta_data: Torrent = Torrent::from_file(path)?;
         println!("Tracker URL: {}", meta_data.announce);
         println!("Length: {}", meta_data.info.length);
-        println!("Info Hash: {}", meta_data.info.to_hash_string());
+        println!("Info Hash: {}", meta_data.info.to_hash_string()?);
         println!("Piece Length: {}", meta_data.info.piece_length);
         println!("Piece Hashes:");
         for chunck in meta_data.info.pieces.chunks(20) {
-            let chuck_hex = meta_data.info.chunks_to_hex(chunck);
+            let chuck_hex = meta_data.info.chunks_to_hex(chunck)?;
             println!("{}", chuck_hex);
         }
     } else if command == "peers" {
-        let path = fs::read(&args[2]).unwrap();
-        let meta_data: Torrent = Torrent::from_file(path);
-        let res = TrackerRequest::new(meta_data.info).fetch_info(meta_data.announce);
-        for peer in res.from_peers() {
+        let path = fs::read(&args[2])?;
+        let meta_data: Torrent = Torrent::from_file(path)?;
+        let res = TrackerRequest::new(meta_data.info)?.fetch_info(meta_data.announce)?;
+        for peer in res.from_peers()? {
             println!("{}", peer);
         }
     } else {
         println!("unknown command: {}", args[1])
     }
+    Ok(())
 }
