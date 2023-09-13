@@ -16,13 +16,15 @@ use std::{
     net::TcpStream,
 };
 
+const PEER_ID: &str = "00112233445566778899";
+
 fn handshake(meta_info: &TorrentInfo, peer: &str) -> Result<String> {
     let mut handshake: Vec<u8> = Vec::new();
     handshake.push(19);
-    handshake.extend_from_slice("BitTorrent protocol".as_bytes());
+    handshake.extend_from_slice(&"BitTorrent protocol".as_bytes());
     handshake.extend_from_slice(&[0 as u8; 8]);
     handshake.append(&mut meta_info.get_hash()?.to_vec());
-    handshake.extend_from_slice("00112233445566778899".as_bytes());
+    handshake.extend_from_slice(&PEER_ID.as_bytes());
     let mut tcp_client = TcpStream::connect(peer)?;
     tcp_client.write_all(&handshake)?;
     let mut res_buf = vec![0 as u8; 68];
