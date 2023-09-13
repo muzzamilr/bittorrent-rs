@@ -27,8 +27,12 @@ fn handshake(meta_info: &TorrentInfo, peer: &str) -> Result<String> {
     tcp_client.write_all(&handshake)?;
     let mut res_buf = vec![0 as u8; 68];
     tcp_client.read_exact(&mut res_buf)?;
-    let peer_id = handshake[48..68].to_vec();
-    Ok(String::from_utf8(peer_id)?)
+    let peer_id = handshake[48..68]
+        .iter()
+        .map(|x| format!("{:x}", x))
+        .collect::<Vec<String>>()
+        .join("");
+    Ok(peer_id)
 }
 
 fn main() -> Result<()> {
