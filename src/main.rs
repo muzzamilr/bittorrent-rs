@@ -18,22 +18,24 @@ use std::{
 
 const PEER_ID: &str = "00112233445566778899";
 
-fn handshake(meta_info: &TorrentInfo, peer: &str) -> Result<String> {
+fn handshake(meta_info: &TorrentInfo, peer: String) -> Result<String> {
     let mut handshake: Vec<u8> = Vec::new();
-    handshake.push(19);
-    handshake.extend_from_slice(&"BitTorrent protocol".as_bytes());
-    handshake.extend_from_slice(&[0 as u8; 8]);
+    handshake.push(19 as u8);
+    handshake.extend_from_slice("BitTorrent protocol".as_bytes());
+    handshake.extend_from_slice(&[0; 8]);
     handshake.append(&mut meta_info.get_hash()?.to_vec());
     handshake.extend_from_slice(&PEER_ID.as_bytes());
+
     let mut tcp_client = TcpStream::connect(peer)?;
-    tcp_client.write_all(&handshake)?;
-    let mut res_buf = vec![0 as u8; 68];
+    tcp_client.write_all(handshake.as_slice())?;
+    let mut res_buf = [0; 68];
     tcp_client.read_exact(&mut res_buf)?;
-    let peer_id = handshake[48..68]
+    let peer_id = res_buf[48..68]
         .iter()
         .map(|x| format!("{:02x}", x))
         .collect::<Vec<String>>()
         .join("");
+
     Ok(peer_id)
 }
 
@@ -74,7 +76,7 @@ fn main() -> Result<()> {
                 TrackerRequest::new(&meta_data.info)?.fetch_info(meta_data.announce.clone())?;
             res.from_peers()?[0].to_string()
         };
-        let peer_id = handshake(&meta_data.info, &ip)?;
+        let peer_id = handshake(&meta_data.info, ip)?;
         println!("Peer ID: {}", peer_id);
     } else {
         println!("unknown command: {}", args[1])
