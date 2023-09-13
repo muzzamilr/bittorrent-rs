@@ -1,43 +1,20 @@
 mod parser;
+mod peer_connection;
 mod result;
 mod torrent;
 mod tracker;
 
 use crate::{
     parser::{decode, ValueToString},
+    peer_connection::PeerConnection,
     result::Result,
-    torrent::{Torrent, TorrentInfo},
-    tracker::{TrackerRequest, TrackerResponse},
+    torrent::Torrent,
+    tracker::TrackerRequest,
 };
 
-use std::{
-    env, fs,
-    io::{Read, Write},
-    net::TcpStream,
-};
+use std::{env, fs};
 
 const PEER_ID: &str = "00112233445566778899";
-
-fn handshake(meta_info: &TorrentInfo, peer: String) -> Result<String> {
-    let mut handshake: Vec<u8> = Vec::new();
-    handshake.push(19 as u8);
-    handshake.extend_from_slice("BitTorrent protocol".as_bytes());
-    handshake.extend_from_slice(&[0; 8]);
-    handshake.append(&mut meta_info.get_hash()?.to_vec());
-    handshake.extend_from_slice(&PEER_ID.as_bytes());
-
-    let mut tcp_client = TcpStream::connect(peer)?;
-    tcp_client.write_all(handshake.as_slice())?;
-    let mut res_buf = [0; 68];
-    tcp_client.read_exact(&mut res_buf)?;
-    let peer_id = res_buf[48..68]
-        .iter()
-        .map(|x| format!("{:02x}", x))
-        .collect::<Vec<String>>()
-        .join("");
-
-    Ok(peer_id)
-}
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -76,7 +53,17 @@ fn main() -> Result<()> {
                 TrackerRequest::new(&meta_data.info)?.fetch_info(meta_data.announce.clone())?;
             res.from_peers()?[0].to_string()
         };
-        let peer_id = handshake(&meta_data.info, ip)?;
+        // let peer_id = handshake(&meta_data.info, ip)?;
+        let connectaion_resp =
+            PeerConnection::new(ip)?.handshake(meta_data.info.get_hash()?.to_vec(), PEER_ID)?;
+
+        let peer_id = connectaion_resp
+            .info_hash
+            .iter()
+            .map(|x| format!("{:02x}", x))
+            .collect::<Vec<String>>()
+            .join("");
+
         println!("Peer ID: {}", peer_id);
     } else {
         println!("unknown command: {}", args[1])
