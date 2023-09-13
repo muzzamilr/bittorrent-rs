@@ -1,13 +1,19 @@
-use std::{
-    env, fs,
-    io::{Read, Write},
-    net::TcpStream,
-};
-use torrent_lib::{
+mod parser;
+mod result;
+mod torrent;
+mod tracker;
+
+use crate::{
     parser::{decode, ValueToString},
     result::Result,
     torrent::{Torrent, TorrentInfo},
     tracker::{TrackerRequest, TrackerResponse},
+};
+
+use std::{
+    env, fs,
+    io::{Read, Write},
+    net::TcpStream,
 };
 
 fn handshake(meta_info: &TorrentInfo, peer: &str) -> Result<String> {
