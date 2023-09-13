@@ -1,10 +1,29 @@
-use std::{env, fs, net::TcpStream};
+use std::{
+    env, fs,
+    io::{Read, Write},
+    net::TcpStream,
+};
 use torrent_lib::{
     parser::{decode, ValueToString},
     result::Result,
     torrent::{Torrent, TorrentInfo},
     tracker::{TrackerRequest, TrackerResponse},
 };
+
+fn handshake(meta_info: &TorrentInfo, peer: &str) -> Result<String> {
+    let mut handshake: Vec<u8> = Vec::new();
+    handshake.push(19);
+    handshake.extend_from_slice("BitTorrent protocol".as_bytes());
+    handshake.extend_from_slice(&[0 as u8; 8]);
+    handshake.append(&mut meta_info.get_hash()?.to_vec());
+    handshake.extend_from_slice("00112233445566778899".as_bytes());
+    let mut tcp_client = TcpStream::connect(peer)?;
+    tcp_client.write_all(&handshake)?;
+    let mut res_buf = vec![0 as u8; 68];
+    tcp_client.read_exact(&mut res_buf)?;
+    let peer_id = handshake[48..68].to_vec();
+    Ok(String::from_utf8(peer_id)?)
+}
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -29,15 +48,22 @@ fn main() -> Result<()> {
     } else if command == "peers" {
         let path = fs::read(&args[2])?;
         let meta_data: Torrent = Torrent::from_file(path)?;
-        let res = TrackerRequest::new(meta_data.info)?.fetch_info(meta_data.announce)?;
+        let res = TrackerRequest::new(&meta_data.info)?.fetch_info(meta_data.announce)?;
         for peer in res.from_peers()? {
             println!("{}", peer);
         }
     } else if command == "handshake" {
         let path = fs::read(&args[2])?;
         let meta_data = Torrent::from_file(path)?;
-        let ip = &args[3];
-        println!("{:?} {:?}", meta_data, ip);
+        let ip = if args.len() > 3 {
+            args[3].clone()
+        } else {
+            let res =
+                TrackerRequest::new(&meta_data.info)?.fetch_info(meta_data.announce.clone())?;
+            res.from_peers()?[0].to_string()
+        };
+        let peer_id = handshake(&meta_data.info, &ip)?;
+        println!("Peer ID: {}", peer_id);
     } else {
         println!("unknown command: {}", args[1])
     }

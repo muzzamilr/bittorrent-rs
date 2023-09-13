@@ -13,7 +13,7 @@ pub struct TrackerRequest {
 }
 
 impl TrackerRequest {
-    pub fn new(data: TorrentInfo) -> Result<TrackerRequest> {
+    pub fn new(data: &TorrentInfo) -> Result<TrackerRequest> {
         Ok(TrackerRequest {
             info_hash: data.encode_url_hash()?,
             peer_id: "00112233445566778899".to_string(),
