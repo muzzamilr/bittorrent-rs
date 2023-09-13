@@ -29,7 +29,7 @@ fn handshake(meta_info: &TorrentInfo, peer: &str) -> Result<String> {
     tcp_client.read_exact(&mut res_buf)?;
     let peer_id = handshake[48..68]
         .iter()
-        .map(|x| format!("{:x}", x))
+        .map(|x| format!("{:02x}", x))
         .collect::<Vec<String>>()
         .join("");
     Ok(peer_id)
