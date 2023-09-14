@@ -12,7 +12,7 @@ use crate::{
     tracker::TrackerRequest,
 };
 
-use std::{env, fs};
+use std::{env, fs, io::Write};
 
 const PEER_ID: &str = "00112233445566778899";
 
@@ -69,14 +69,52 @@ fn main() -> Result<()> {
         let meta_data = Torrent::from_file(file)?;
         let path = args[3].clone();
         let piece_index = args[5].parse::<usize>()?;
-        let resp = TrackerRequest::new(&meta_data.info)?.fetch_info(meta_data.announce.clone())?;
-        let peer = resp.from_peers()?[0].clone();
+        let peer = TrackerRequest::new(&meta_data.info)?
+            .fetch_info(meta_data.announce.clone())?
+            .from_peers()?[0]
+            .clone();
         let mut peer_conn = PeerConnection::new(peer)?;
         peer_conn.handshake(meta_data.info.get_hash()?.to_vec(), PEER_ID)?;
         peer_conn.wait(PeerConnection::BITFIELD)?;
         peer_conn.send_interested()?;
         peer_conn.wait(PeerConnection::UNCHOKE)?;
-        peer_conn.download_piece(meta_data, piece_index as u32, path)?;
+        let piece = peer_conn.download_piece(meta_data, piece_index as u32)?;
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(&path)?;
+        file.write_all(&piece).unwrap();
+        println!("Piece {} downloaded to {}.", &piece_index, &path);
+    } else if command == "download" {
+        let file = fs::read(&args[4])?;
+        let meta_data = Torrent::from_file(file)?;
+        let path = args[3].clone();
+        let peers = TrackerRequest::new(&meta_data.info)?
+            .fetch_info(meta_data.announce.clone())?
+            .from_peers()?;
+
+        let mut final_out = vec![0; meta_data.info.length];
+        for (i, _) in meta_data.info.hex_pieces().iter().enumerate() {
+            let peer = peers[0].clone();
+            let mut peer_conn = PeerConnection::new(peer)?;
+            peer_conn.handshake(meta_data.info.get_hash()?.to_vec(), PEER_ID)?;
+            peer_conn.wait(PeerConnection::BITFIELD)?;
+            peer_conn.send_interested()?;
+            peer_conn.wait(PeerConnection::UNCHOKE)?;
+            let piece = peer_conn.download_piece(meta_data.clone(), i as u32)?;
+            final_out.splice(
+                i * meta_data.info.piece_length..i * meta_data.info.piece_length + piece.len(),
+                piece.iter().cloned(),
+            );
+        }
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(&path)
+            .unwrap();
+        file.write_all(&final_out).unwrap();
+
+        println!("Downloaded {} to {}.", &args[4], &path);
     } else {
         println!("unknown command: {}", args[1])
     }

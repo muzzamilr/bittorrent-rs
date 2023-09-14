@@ -4,7 +4,7 @@ use serde_bencode::{self};
 use super::result::Result;
 use sha1::{digest::Output, Digest, Sha1};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TorrentInfo {
     pub name: String,
     pub length: usize,
@@ -60,7 +60,7 @@ impl TorrentInfo {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Torrent {
     pub announce: String,
     pub info: TorrentInfo,

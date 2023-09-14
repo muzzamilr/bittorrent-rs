@@ -84,19 +84,16 @@ impl PeerConnection {
         Ok(())
     }
 
-    // pub fn download_piece(&mut self, meta_data: Torrent, piece_index: u32, path: String) {}
-    pub fn download_piece(&mut self, meta: Torrent, piece_index: u32, path: String) -> Result<()> {
+    pub fn download_piece(&mut self, meta: Torrent, piece_index: u32) -> Result<Vec<u8>> {
         let is_last_piece = piece_index as usize == meta.info.hex_pieces().len() - 1;
         let piece_length = if is_last_piece {
             meta.info.length - (piece_index as usize * meta.info.piece_length)
         } else {
             meta.info.piece_length
         };
-        println!("* Piece length: {}", piece_length);
         const CHUNK_SIZE: usize = 16 * 1024;
         let block_count = piece_length / CHUNK_SIZE + (piece_length % CHUNK_SIZE != 0) as usize;
         for i in 0..block_count {
-            println!("++ Requesting block {}", i);
             let length = if i == block_count - 1 {
                 piece_length - (i * CHUNK_SIZE)
             } else {
@@ -107,21 +104,13 @@ impl PeerConnection {
         let mut piece_data = vec![0; piece_length];
         for _ in 0..block_count {
             let resp = self.wait(PeerConnection::PIECE)?;
-            println!("* Received response of length {}", resp.len());
             let index = u32::from_be_bytes([resp[0], resp[1], resp[2], resp[3]]);
             if index != piece_index {
-                println!("index mismatch, expected {}, got {}", &piece_index, index);
                 continue;
             }
             let begin = u32::from_be_bytes([resp[4], resp[5], resp[6], resp[7]]) as usize;
             piece_data.splice(begin..begin + resp[8..].len(), resp[8..].iter().cloned());
-            println!(
-                "-- Received block {} of length {}",
-                begin / CHUNK_SIZE,
-                resp.len() - 8
-            );
         }
-        println!("% All pieces received, verifying hash");
         let mut hasher = Sha1::new();
         hasher.update(&piece_data.as_slice());
         let fetched_piece_hash = hasher
@@ -132,13 +121,7 @@ impl PeerConnection {
             .join("");
         let piece_hash = meta.info.hex_pieces()[piece_index as usize].clone();
         if fetched_piece_hash == piece_hash {
-            let mut file = std::fs::OpenOptions::new()
-                .create(true)
-                .write(true)
-                .open(&path)
-                .unwrap();
-            file.write_all(&piece_data).unwrap();
-            println!("Piece {} downloaded to {}.", &piece_index, &path);
+            Ok(piece_data)
         } else {
             println!(
                 "% piece hash mismatch, expected {}({}), got {}({})",
@@ -147,9 +130,8 @@ impl PeerConnection {
                 fetched_piece_hash,
                 fetched_piece_hash.len()
             );
+            Ok(piece_data)
         }
-
-        Ok(())
     }
 
     pub fn wait(&mut self, id: u8) -> Result<Vec<u8>> {
@@ -157,7 +139,7 @@ impl PeerConnection {
         self.tcp_stream.read_exact(&mut length_prefix)?;
         let mut message_id = [0; 1];
         self.tcp_stream.read_exact(&mut message_id)?;
-        if (message_id[0] != id) {
+        if message_id[0] != id {
             panic!("* Expected message id {}, got {}", id, message_id[0]);
         }
         let resp_size = u32::from_be_bytes(length_prefix) - 1;
