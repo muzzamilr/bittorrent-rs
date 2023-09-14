@@ -102,7 +102,7 @@ impl PeerConnection {
             } else {
                 CHUNK_SIZE
             };
-            self.send_request(piece_index, (i * CHUNK_SIZE) as u32, length as u32);
+            self.send_request(piece_index, (i * CHUNK_SIZE) as u32, length as u32)?;
         }
         let mut piece_data = vec![0; piece_length];
         for _ in 0..block_count {
@@ -131,8 +131,6 @@ impl PeerConnection {
             .collect::<Vec<String>>()
             .join("");
         let piece_hash = meta.info.hex_pieces()[piece_index as usize].clone();
-        // println!("% Expected piece hash: {}", &piece_hash);
-        // println!("% Received piece hash: {}", &fetched_piece_hash);
         if fetched_piece_hash == piece_hash {
             let mut file = std::fs::OpenOptions::new()
                 .create(true)

@@ -12,7 +12,7 @@ use crate::{
     tracker::TrackerRequest,
 };
 
-use std::{env, fs, u8};
+use std::{env, fs};
 
 const PEER_ID: &str = "00112233445566778899";
 
