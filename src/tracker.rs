@@ -1,4 +1,5 @@
 use super::{result::Result, torrent::TorrentInfo};
+use crate::PEER_ID;
 use serde::{Deserialize, Serialize};
 use serde_bencode::{self, value::Value};
 
@@ -16,7 +17,7 @@ impl TrackerRequest {
     pub fn new(data: &TorrentInfo) -> Result<TrackerRequest> {
         Ok(TrackerRequest {
             info_hash: data.encode_url_hash()?,
-            peer_id: "00112233445566778899".to_string(),
+            peer_id: PEER_ID.to_string(),
             port: 6881,
             uploaded: 0,
             downloaded: 0,

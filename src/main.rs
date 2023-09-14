@@ -12,7 +12,7 @@ use crate::{
     tracker::TrackerRequest,
 };
 
-use std::{env, fs};
+use std::{env, fs, u8};
 
 const PEER_ID: &str = "00112233445566778899";
 
@@ -53,7 +53,6 @@ fn main() -> Result<()> {
                 TrackerRequest::new(&meta_data.info)?.fetch_info(meta_data.announce.clone())?;
             res.from_peers()?[0].to_string()
         };
-        // let peer_id = handshake(&meta_data.info, ip)?;
         let connectaion_resp =
             PeerConnection::new(ip)?.handshake(meta_data.info.get_hash()?.to_vec(), PEER_ID)?;
 
@@ -65,6 +64,19 @@ fn main() -> Result<()> {
             .join("");
 
         println!("Peer ID: {}", peer_id);
+    } else if command == "download_piece" {
+        let file = fs::read(&args[4])?;
+        let meta_data = Torrent::from_file(file)?;
+        let path = args[3].clone();
+        let piece_index = args[5].parse::<usize>()?;
+        let resp = TrackerRequest::new(&meta_data.info)?.fetch_info(meta_data.announce.clone())?;
+        let peer = resp.from_peers()?[0].clone();
+        let mut peer_conn = PeerConnection::new(peer)?;
+        peer_conn.handshake(meta_data.info.get_hash()?.to_vec(), PEER_ID)?;
+        peer_conn.wait(PeerConnection::BITFIELD)?;
+        peer_conn.send_interested()?;
+        peer_conn.wait(PeerConnection::UNCHOKE)?;
+        peer_conn.download_piece(meta_data, piece_index as u32, path)?;
     } else {
         println!("unknown command: {}", args[1])
     }

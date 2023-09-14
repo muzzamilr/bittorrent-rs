@@ -40,6 +40,23 @@ impl TorrentInfo {
             .map(|val| format!("{:02x}", val))
             .collect::<String>())
     }
+
+    pub fn hex_pieces(&self) -> Vec<String> {
+        return self
+            .pieces
+            .chunks(20)
+            .map(|chunk| {
+                format!(
+                    "{}",
+                    chunk
+                        .iter()
+                        .map(|b| { format!("{:02x}", b) })
+                        .collect::<Vec<String>>()
+                        .join("")
+                )
+            })
+            .collect();
+    }
 }
 
 #[allow(dead_code)]
