@@ -49,11 +49,7 @@ impl PeerConnection {
         self.tcp_stream.write_all(handshake.as_slice())?;
         let mut res_buf = [0; 68];
         self.tcp_stream.read_exact(&mut res_buf)?;
-        let peer_id = res_buf[48..68]
-            .iter()
-            .map(|x| format!("{:02x}", x))
-            .collect::<Vec<String>>()
-            .join("");
+
         Ok(PeerConnectionResponse {
             info_hash: res_buf[28..48].to_vec(),
             peer_id: res_buf[48..68].to_vec(),

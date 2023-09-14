@@ -57,7 +57,7 @@ fn main() -> Result<()> {
             PeerConnection::new(ip)?.handshake(meta_data.info.get_hash()?.to_vec(), PEER_ID)?;
 
         let peer_id = connectaion_resp
-            .info_hash
+            .peer_id
             .iter()
             .map(|x| format!("{:02x}", x))
             .collect::<Vec<String>>()
